@@ -1,0 +1,31 @@
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+dist/
+.vite/
+.env
+.env.local
+.env.*
+
+# Python
+__pycache__/
+*.pyc
+.env/
+venv/
+.env.dev
+.env.prod
+
+# Build artifacts
+*.log
+
+# Supabase
+.supabase/
+
+# Docker
+*.pid
+
+# IDE/editor
+.vscode/
+.idea/
