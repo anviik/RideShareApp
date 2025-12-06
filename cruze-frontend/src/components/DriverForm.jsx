@@ -1,30 +1,107 @@
+// src/components/DriverForm.jsx
 import { useState } from "react";
 
-export default function DriverForm({ onSubmit }) {
-  const [trip, setTrip] = useState({
+function DriverForm({ onSubmit }) {
+  const [form, setForm] = useState({
     origin: "",
     destination: "",
     date: "",
     time: "",
     seats: 1,
-    price: 5,
+    price: "",
   });
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((f) => ({ ...f, [name]: value }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSubmit(form);
+    // optional: reset
+    // setForm({ ...form, price: "", seats: 1 });
+  };
 
   return (
     <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSubmit(trip);
-      }}
-      className="flex flex-col gap-3"
+      onSubmit={handleSubmit}
+      className="mt-4 space-y-3 bg-slate-900 border border-slate-800 rounded-lg p-4"
     >
-      <input placeholder="Origin" onChange={(e) => setTrip({ ...trip, origin: e.target.value })} />
-      <input placeholder="Destination" onChange={(e) => setTrip({ ...trip, destination: e.target.value })} />
-      <input type="date" onChange={(e) => setTrip({ ...trip, date: e.target.value })} />
-      <input type="time" onChange={(e) => setTrip({ ...trip, time: e.target.value })} />
-      <input type="number" placeholder="Seats" onChange={(e) => setTrip({ ...trip, seats: e.target.value })} />
-      <input type="number" placeholder="Price" onChange={(e) => setTrip({ ...trip, price: e.target.value })} />
-      <button className="bg-blue-600 text-white rounded p-2">Post Ride</button>
+      <h2 className="font-semibold mb-1 text-sm">Post a trip as a driver</h2>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <div>
+          <label className="block text-xs mb-1">Leaving from</label>
+          <input
+            name="origin"
+            value={form.origin}
+            onChange={handleChange}
+            className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm"
+            placeholder="UC Merced campus"
+          />
+        </div>
+        <div>
+          <label className="block text-xs mb-1">Going to</label>
+          <input
+            name="destination"
+            value={form.destination}
+            onChange={handleChange}
+            className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm"
+            placeholder="Bay Area, LA, etc."
+          />
+        </div>
+        <div>
+          <label className="block text-xs mb-1">Date</label>
+          <input
+            type="date"
+            name="date"
+            value={form.date}
+            onChange={handleChange}
+            className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-xs mb-1">Time</label>
+          <input
+            type="time"
+            name="time"
+            value={form.time}
+            onChange={handleChange}
+            className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-xs mb-1">Available seats</label>
+          <input
+            type="number"
+            min="1"
+            name="seats"
+            value={form.seats}
+            onChange={handleChange}
+            className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-xs mb-1">Price per seat ($)</label>
+          <input
+            name="price"
+            value={form.price}
+            onChange={handleChange}
+            className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm"
+            placeholder="10"
+          />
+        </div>
+      </div>
+
+      <button
+        type="submit"
+        className="mt-2 bg-indigo-500 hover:bg-indigo-600 text-sm font-semibold px-3 py-2 rounded-md"
+      >
+        Post trip
+      </button>
     </form>
   );
 }
+
+export default DriverForm;
