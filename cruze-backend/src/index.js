@@ -33,6 +33,8 @@ let requests = []
 let idCounter = 1
 
 // --- Routes ---
+app.get('/', (_, res) => res.send('Cruze backend is running. Try /health or /api/trips'))
+
 app.get('/health', (_, res) => res.json({ ok: true }))
 
 app.get('/api/trips', (_, res) => res.json(trips))
