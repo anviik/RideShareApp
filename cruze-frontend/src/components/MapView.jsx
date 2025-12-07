@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+console.log("VITE GOOGLE KEY IN MAPVIEW:", GOOGLE_MAPS_API_KEY);
+
 const FALLBACK_CENTER = { lat: 37.3636, lng: -120.4241 }; // UC Merced
 let googleMapsScriptPromise;
 
