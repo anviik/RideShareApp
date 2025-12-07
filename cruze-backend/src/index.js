@@ -27,33 +27,67 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null
 
-// In-memory demo store (replace with Supabase tables)
-let trips = []
-let requests = []
-let idCounter = 1
-
 // --- Routes ---
 app.get('/', (_, res) => res.send('Cruze backend is running. Try /health or /api/trips'))
 
 app.get('/health', (_, res) => res.json({ ok: true }))
 
-app.get('/api/trips', (_, res) => res.json(trips))
+// Get all trips from Supabase
+app.get('/api/trips', async (_, res) => {
+  const { data, error } = await supabase
+    .from('trips')
+    .select('*')
+    .order('created_at', { ascending: false })
+  
+  if (error) return res.status(500).json({ error: error.message })
+  res.json(data)
+})
 
+// Create a new trip in Supabase
 app.post('/api/trips', async (req, res) => {
-  const t = { id: idCounter++, ...req.body }
-  trips.push(t)
-  return res.status(201).json(t)
+  const { origin, destination, date, time, seats, price } = req.body
+  
+  const { data, error } = await supabase
+    .from('trips')
+    .insert([{ origin, destination, date, time, seats, price }])
+    .select()
+    .single()
+  
+  if (error) return res.status(400).json({ error: error.message })
+  res.status(201).json(data)
 })
 
+// Create a new ride request in Supabase
 app.post('/api/requests', async (req, res) => {
-  const r = { id: idCounter++, ...req.body, status: 'pending' }
-  requests.push(r)
-  return res.status(201).json(r)
+  const { origin, destination, date, timeWindow, seatsNeeded, trip_id } = req.body
+  
+  const { data, error } = await supabase
+    .from('ride_requests')
+    .insert([{ 
+      origin, 
+      destination, 
+      date, 
+      time_window: timeWindow, 
+      seats_needed: seatsNeeded,
+      trip_id,
+      status: 'pending' 
+    }])
+    .select()
+    .single()
+  
+  if (error) return res.status(400).json({ error: error.message })
+  res.status(201).json(data)
 })
 
+// Fetch matching candidates from Supabase and call matching service
 app.get('/api/match/:tripId', async (req, res) => {
-  // Fetch candidate riders from our "requests" demo store
-  const candidates = requests.filter(r => r.trip_id == req.params.tripId)
+  const { data: candidates, error } = await supabase
+    .from('ride_requests')
+    .select('*')
+    .eq('trip_id', req.params.tripId)
+  
+  if (error) return res.status(500).json({ error: error.message })
+  
   try {
     const resp = await fetch(`${process.env.MATCHING_URL}/match`, {
       method: 'POST',
@@ -71,8 +105,15 @@ app.get('/api/match/:tripId', async (req, res) => {
 app.post('/api/checkout', async (req, res) => {
   if (!stripe) return res.json({ url: 'https://example.com/checkout-demo' }) // dev fallback
   const { trip_id } = req.body
-  const trip = trips.find(t => t.id === trip_id)
-  if (!trip) return res.status(404).json({ error: 'trip not found' })
+  
+  // Fetch trip from Supabase
+  const { data: trip, error } = await supabase
+    .from('trips')
+    .select('*')
+    .eq('id', trip_id)
+    .single()
+  
+  if (error || !trip) return res.status(404).json({ error: 'trip not found' })
 
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
