@@ -1,5 +1,5 @@
 // src/pages/Home.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import RoleSelector from "../components/RoleSelector";
 import DriverForm from "../components/DriverForm";
 import RiderForm from "../components/RiderForm";
@@ -10,16 +10,57 @@ function Home() {
   const [role, setRole] = useState("rider"); // "driver" | "rider"
   const [rides, setRides] = useState([]);
 
+  // Fetch trips from backend on mount
+  useEffect(() => {
+    const fetchTrips = async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/trips`);
+        if (res.ok) {
+          const data = await res.json();
+          setRides(data);
+        }
+      } catch (err) {
+        console.error('Failed to load trips:', err);
+      }
+    };
+    fetchTrips();
+  }, []);
+
   const handleDriverSubmit = async (tripData) => {
-    console.log("Driver posted trip:", tripData);
-    // TODO: call backend POST /api/trips
-    setRides((prev) => [...prev, { id: prev.length + 1, ...tripData }]);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/trips`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tripData)
+      });
+      if (res.ok) {
+        const newTrip = await res.json();
+        setRides(prev => [newTrip, ...prev]);
+        console.log("Driver posted trip:", newTrip);
+      } else {
+        console.error('Failed to post trip');
+      }
+    } catch (err) {
+      console.error('Failed to post trip:', err);
+    }
   };
 
   const handleRiderSubmit = async (requestData) => {
-    console.log("Rider requested ride:", requestData);
-    // TODO: call backend POST /api/ride-requests
-    // could also trigger matching later
+    try {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/requests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestData)
+      });
+      if (res.ok) {
+        console.log("Rider requested ride:", requestData);
+        alert('Ride request submitted successfully!');
+      } else {
+        console.error('Failed to submit ride request');
+      }
+    } catch (err) {
+      console.error('Failed to submit ride request:', err);
+    }
   };
 
   return (
