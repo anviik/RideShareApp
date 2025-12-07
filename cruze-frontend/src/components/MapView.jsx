@@ -23,7 +23,7 @@ function loadGoogleMaps(apiKey) {
       }
 
       const script = document.createElement("script");
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,marker&v=weekly`;
       script.async = true;
       script.defer = true;
       script.dataset.googleMaps = "true";
@@ -50,8 +50,11 @@ function getUserLocation() {
           lng: position.coords.longitude,
         });
       },
-      (error) => reject(error),
-      { enableHighAccuracy: true, timeout: 10000 }
+      (error) => {
+        console.warn("Geolocation error:", error);
+        reject(error);
+      },
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
     );
   });
 }
@@ -99,15 +102,32 @@ function MapView() {
         mapInstance = new window.google.maps.Map(mapRef.current, {
           center,
           zoom: 14,
-          disableDefaultUI: true,
+          disableDefaultUI: false,
+          zoomControl: true,
+          mapTypeControl: false,
+          scaleControl: false,
+          streetViewControl: false,
+          rotateControl: false,
+          fullscreenControl: true,
           gestureHandling: "greedy",
+          mapId: "DEMO_MAP_ID", // Required for Advanced Markers
         });
 
-        marker = new window.google.maps.Marker({
-          position: center,
-          map: mapInstance,
-          title: "You are here",
-        });
+        // Use AdvancedMarkerElement instead of deprecated Marker
+        if (window.google.maps.marker?.AdvancedMarkerElement) {
+          marker = new window.google.maps.marker.AdvancedMarkerElement({
+            position: center,
+            map: mapInstance,
+            title: "You are here",
+          });
+        } else {
+          // Fallback to old Marker if AdvancedMarkerElement not available
+          marker = new window.google.maps.Marker({
+            position: center,
+            map: mapInstance,
+            title: "You are here",
+          });
+        }
 
         setMapState({
           status: "ready",
@@ -130,7 +150,11 @@ function MapView() {
 
     return () => {
       cancelled = true;
-      if (marker) marker.setMap(null);
+      if (marker) {
+        // Handle both marker types
+        if (marker.setMap) marker.setMap(null);
+        if (marker.map) marker.map = null;
+      }
       mapInstance = null;
     };
   }, []);
