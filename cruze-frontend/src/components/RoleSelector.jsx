@@ -1,12 +1,13 @@
 // src/components/RoleSelector.jsx
 function RoleSelector({ role, onChange }) {
   const base =
-    "px-3 py-2 rounded-md text-sm border border-slate-700 cursor-pointer";
-  const active = "bg-indigo-500 text-white border-indigo-500";
-  const inactive = "bg-slate-900 text-slate-300 hover:bg-slate-800";
+    "px-3 py-2 rounded-md text-sm border cursor-pointer transition-colors";
+  const active = "bg-slate-900 text-white border-slate-900 shadow-sm";
+  const inactive =
+    "bg-white text-slate-700 border-slate-200 hover:border-slate-400";
 
   return (
-    <div className="inline-flex gap-2">
+    <div className="inline-flex gap-2 bg-slate-100 p-1 rounded-lg">
       <button
         type="button"
         className={`${base} ${role === "rider" ? active : inactive}`}

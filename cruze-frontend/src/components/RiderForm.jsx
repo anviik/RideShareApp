@@ -23,20 +23,20 @@ function RiderForm({ onSubmit }) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="mt-4 space-y-3 bg-slate-900 border border-slate-800 rounded-lg p-4"
+      className="mt-4 space-y-4 bg-slate-50 border border-slate-200 rounded-xl p-4 shadow"
     >
-      <h2 className="font-semibold mb-1 text-sm">
+      <h2 className="font-semibold mb-1 text-sm text-slate-800">
         Request a ride as a rider
       </h2>
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-2 text-slate-800">
         <div>
           <label className="block text-xs mb-1">Leaving from</label>
           <input
             name="origin"
             value={form.origin}
             onChange={handleChange}
-            className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm"
+            className="w-full bg-white border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
             placeholder="UC Merced or your current location"
           />
         </div>
@@ -46,7 +46,7 @@ function RiderForm({ onSubmit }) {
             name="destination"
             value={form.destination}
             onChange={handleChange}
-            className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm"
+            className="w-full bg-white border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
             placeholder="City / neighborhood"
           />
         </div>
@@ -57,7 +57,7 @@ function RiderForm({ onSubmit }) {
             name="date"
             value={form.date}
             onChange={handleChange}
-            className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm"
+            className="w-full bg-white border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
           />
         </div>
         <div>
@@ -66,7 +66,7 @@ function RiderForm({ onSubmit }) {
             name="timeWindow"
             value={form.timeWindow}
             onChange={handleChange}
-            className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm"
+            className="w-full bg-white border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
             placeholder="e.g. 3–6 PM"
           />
         </div>
@@ -78,14 +78,14 @@ function RiderForm({ onSubmit }) {
             name="seatsNeeded"
             value={form.seatsNeeded}
             onChange={handleChange}
-            className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm"
+            className="w-full bg-white border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
           />
         </div>
       </div>
 
       <button
         type="submit"
-        className="mt-2 bg-indigo-500 hover:bg-indigo-600 text-sm font-semibold px-3 py-2 rounded-md"
+        className="mt-2 bg-slate-900 hover:bg-slate-800 text-sm font-semibold px-3 py-2 rounded-md text-white"
       >
         Request ride
       </button>

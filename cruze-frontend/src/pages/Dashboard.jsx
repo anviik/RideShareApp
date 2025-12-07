@@ -2,8 +2,8 @@
 function Dashboard() {
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-3">Dashboard</h1>
-      <p className="text-sm text-slate-300">
+      <h1 className="text-2xl font-bold mb-3 text-slate-900">Dashboard</h1>
+      <p className="text-sm text-slate-600">
         show upcoming trips, recent matches, and quick
         shortcuts. For now it is just a placeholder.
       </p>
