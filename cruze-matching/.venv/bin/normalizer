@@ -1,4 +1,4 @@
-#!/Users/anvikudaraya/Downloads/RideShare/cruze-matching/.venv/bin/python
+#!/Users/anvikudaraya/Downloads/RideShare/cruze-matching/.venv/bin/python3.11
 # -*- coding: utf-8 -*-
 import re
 import sys
