@@ -69,14 +69,9 @@ function Home() {
 
         {/* Left Column */}
         <section className="space-y-6">
-          <h1 className="text-3xl font-semibold text-gray-800 bg-white">
+          <h1 className="text-3xl font-semibold text-gray-800 bg-gray">
             Find or share rides with Cruze
           </h1>
-
-          <p className="text-sm text-gray-600 leading-relaxed">
-            Choose whether you are driving or looking for a ride, then fill out the details.
-            Cruze helps match UC Merced students traveling in the same direction.
-          </p>
 
           <div className="border rounded-xl p-4 bg-white shadow-md shadow-slate-200/70">
             <RoleSelector role={role} onChange={setRole} />
@@ -96,13 +91,12 @@ function Home() {
         </section>
 
         {/* Right Column */}
-        <section className="space-y-4">
+        <section className="space-y-4 mt-4">
           <h2 className="text-lg font-medium text-gray-800">Map view</h2>
-
-          <div className="border rounded-xl bg-white shadow-md shadow-slate-200/70 p-2 h-[500px]">
+          <div className="border rounded-xl bg-white shadow-md shadow-slate-200/70 p-2 h-[340px]">
             <MapView />
           </div>
-        </section>
+</section>
 
       </div>
     </div>

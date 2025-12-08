@@ -1,8 +1,9 @@
 // src/App.jsx
-import { Routes, Route, Link } from "react-router-dom";
+import { Routes, Route, Link, Navigate } from "react-router-dom";
 import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
+import Auth from "./pages/Auth";
 
 function App() {
   return (
@@ -22,6 +23,9 @@ function App() {
           <Link to="/profile" className="hover:text-slate-900">
             Profile
           </Link>
+          <Link to="/login" className="hover:text-slate-900">
+            Login
+          </Link>
         </nav>
 
         <div className="text-xs text-slate-500">
@@ -31,10 +35,12 @@ function App() {
 
       <main className="flex-1 px-6 py-8">
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<Auth />} />
+          <Route path="/home" element={<Home />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/profile" element={<Profile />} />
-          <Route path="*" element={<div>Page not found</div>} />
+          <Route path="/login" element={<Auth />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
     </div>
