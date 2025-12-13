@@ -29,24 +29,54 @@ class MatchRequest(BaseModel):
 INTERNAL_TOKEN = os.getenv("BACKEND_INTERNAL_TOKEN")
 
 
+def _parse_date(value: Optional[str]):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value).date()
+    except Exception:
+        return None
+
+
+def _parse_datetime(value: Optional[str]):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except Exception:
+        return None
+
+
 def score_candidate(c: Candidate) -> Tuple[float, str]:
-    """Heuristic scorer to rank rider requests for a driver trip."""
-    score = 1.0
+    """
+    Heuristic scorer to rank rider requests for a driver trip.
+    Higher is better. Bounds are clamped to 0..1 to keep outputs stable.
+    """
+    score = 0.5
     reasons = []
 
     # Penalize non-pending requests
     if c.status and c.status.lower() != "pending":
-        score -= 0.35
+        score -= 0.4
         reasons.append(f"status {c.status}")
 
-    # Seats: prefer smaller asks, cap penalty for large groups
+    # Seats: prefer smaller asks, gently penalize large groups
     seats = c.seats_needed or 1
-    if seats <= 2:
-        score += 0.05
+    if seats == 1:
+        score += 0.1
+        reasons.append("solo rider")
+    elif seats == 2:
+        score += 0.08
         reasons.append("small party")
-    elif seats >= 5:
-        score -= 0.15
-        reasons.append("large party")
+    elif seats == 3:
+        score += 0.05
+        reasons.append("moderate party")
+    elif seats == 4:
+        score += 0.02
+        reasons.append("medium party")
+    else:
+        score -= 0.12
+        reasons.append(f"large party ({seats})")
 
     # Require origin/destination
     if not c.origin or not c.destination:
@@ -55,26 +85,42 @@ def score_candidate(c: Candidate) -> Tuple[float, str]:
 
     # Prefer requests with a time window
     if c.time_window:
-        score += 0.05
+        score += 0.08
         reasons.append("has time window")
     else:
-        score -= 0.05
+        score -= 0.04
         reasons.append("no time window")
 
-    # Slight boost if date is present and not in the past
+    # Date weighting
+    today = datetime.utcnow().date()
     if c.date:
-        try:
-            req_date = datetime.fromisoformat(c.date).date()
-            if req_date >= datetime.utcnow().date():
-                score += 0.05
-                reasons.append("date present")
+        req_date = _parse_date(c.date)
+        if req_date:
+            if req_date >= today:
+                score += 0.07
+                reasons.append("date ok")
             else:
-                score -= 0.05
+                score -= 0.2
                 reasons.append("date in past")
-        except ValueError:
+        else:
+            score -= 0.05
             reasons.append("invalid date")
 
-    # Keep score within 0..1 bounds
+    # Recency of request
+    if c.created_at:
+        created_dt = _parse_datetime(c.created_at)
+        if created_dt:
+            age_days = (today - created_dt.date()).days
+            if age_days <= 1:
+                score += 0.05
+                reasons.append("fresh request")
+            elif age_days <= 7:
+                score += 0.02
+                reasons.append("recent request")
+            elif age_days > 30:
+                score -= 0.05
+                reasons.append("stale request")
+
     score = max(0.0, min(1.0, score))
     reason_str = ", ".join(reasons) if reasons else "default weighting"
     return score, reason_str
@@ -99,13 +145,15 @@ def match_health():
 def match_candidates(
     payload: MatchRequest,
     x_internal_token: str = Header(default="", convert_underscores=False),
+    x_internal_token_dash: str = Header(default="", convert_underscores=False, alias="x-internal-token"),
 ):
     """
     Rank rider requests for a given trip.
     - No DB lookups; relies on candidates supplied by the backend.
     - Returns scored list sorted by best match first.
     """
-    check_internal_token(x_internal_token)
+    token = x_internal_token or x_internal_token_dash
+    check_internal_token(token)
 
     if not payload.candidates:
         return {"tripId": payload.tripId, "matches": [], "count": 0}
