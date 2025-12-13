@@ -1,4 +1,6 @@
-#!/Users/saketpoludasu/Desktop/RideShare/cruze-matching/.venv/bin/python3.13
+#!/bin/sh
+'''exec' "/Users/trinabhsharma/Documents/Trinabh's Homework/CSE 108/Final Project/RideShare/cruze-matching/.venv/bin/python" "$0" "$@"
+' '''
 # -*- coding: utf-8 -*-
 import re
 import sys
