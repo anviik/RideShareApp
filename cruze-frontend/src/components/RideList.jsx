@@ -1,4 +1,3 @@
-// src/components/RideList.jsx
 function RideList({ rides }) {
   if (!rides || rides.length === 0) {
     return (

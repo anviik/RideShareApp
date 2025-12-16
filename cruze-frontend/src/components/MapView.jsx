@@ -1,10 +1,9 @@
-// src/components/MapView.jsx
 import { useEffect, useRef, useState } from "react";
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 console.log("VITE GOOGLE KEY IN MAPVIEW:", GOOGLE_MAPS_API_KEY);
 
-const FALLBACK_CENTER = { lat: 37.3636, lng: -120.4241 }; // UC Merced
+const FALLBACK_CENTER = { lat: 37.3636, lng: -120.4241 };
 let googleMapsScriptPromise;
 
 function loadGoogleMaps(apiKey) {
@@ -112,10 +111,9 @@ function MapView() {
           rotateControl: false,
           fullscreenControl: true,
           gestureHandling: "greedy",
-          mapId: "DEMO_MAP_ID", // Required for Advanced Markers
+          mapId: "DEMO_MAP_ID",
         });
 
-        // Use AdvancedMarkerElement instead of deprecated Marker
         if (window.google.maps.marker?.AdvancedMarkerElement) {
           marker = new window.google.maps.marker.AdvancedMarkerElement({
             position: center,
@@ -123,7 +121,6 @@ function MapView() {
             title: "You are here",
           });
         } else {
-          // Fallback to old Marker if AdvancedMarkerElement not available
           marker = new window.google.maps.Marker({
             position: center,
             map: mapInstance,
@@ -153,7 +150,6 @@ function MapView() {
     return () => {
       cancelled = true;
       if (marker) {
-        // Handle both marker types
         if (marker.setMap) marker.setMap(null);
         if (marker.map) marker.map = null;
       }

@@ -1,4 +1,3 @@
-// src/pages/Auth.jsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
@@ -26,9 +25,7 @@ function Auth() {
     setForm((f) => ({ ...f, [name]: value }));
   };
 
-  // ⭐ NEW: Guest login
   const handleGuestLogin = () => {
-    // Simple guest flow: persist a guest flag and send to Home
     const guestUser = {
       id: "guest_" + Date.now(),
       email: null,
@@ -71,7 +68,6 @@ function Auth() {
           if (error) throw error;
         }
 
-        // Persist the signed-in user locally for profile rendering
         const { data: userData } = await supabase.auth.getUser();
         if (userData?.user) {
           const profile = {

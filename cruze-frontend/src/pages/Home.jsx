@@ -1,5 +1,5 @@
-// src/pages/Home.jsx
 import { useState, useEffect } from "react";
+import { supabase } from "../lib/supabase";
 import RoleSelector from "../components/RoleSelector";
 import DriverForm from "../components/DriverForm";
 import RiderForm from "../components/RiderForm";
@@ -10,7 +10,6 @@ function Home() {
   const [role, setRole] = useState("rider");
   const [rides, setRides] = useState([]);
 
-  // Prefer a previously chosen role if available
   useEffect(() => {
     const stored = localStorage.getItem("user");
     if (!stored) return;
@@ -20,11 +19,9 @@ function Home() {
         setRole(parsed.role);
       }
     } catch (_) {
-      /* ignore malformed local storage */
     }
   }, []);
 
-  // When role changes on Home, persist it to keep dashboard consistent
   useEffect(() => {
     const stored = localStorage.getItem("user");
     if (!stored) return;
@@ -34,11 +31,9 @@ function Home() {
       localStorage.setItem("user", JSON.stringify(updated));
       window.__USER__ = updated;
     } catch (_) {
-      /* ignore persistence errors */
     }
   }, [role]);
 
-  // Fetch trips from backend on mount
   useEffect(() => {
     const fetchTrips = async () => {
       try {
@@ -56,38 +51,75 @@ function Home() {
 
   const handleDriverSubmit = async (tripData) => {
     try {
+      let token = null;
+      if (supabase) {
+        const { data: { session } } = await supabase.auth.getSession();
+        token = session?.access_token;
+      }
+      
+      if (!token) {
+        alert('Please log in to create a trip');
+        return;
+      }
+      
       const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/trips`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(tripData)
       });
+      
       if (res.ok) {
         const newTrip = await res.json();
         setRides(prev => [newTrip, ...prev]);
         console.log("Driver posted trip:", newTrip);
+        alert('Trip created successfully!');
       } else {
-        console.error('Failed to post trip');
+        const error = await res.json();
+        alert(error.error || 'Failed to post trip');
+        console.error('Failed to post trip:', error);
       }
     } catch (err) {
       console.error('Failed to post trip:', err);
+      alert('Network error: Could not create trip');
     }
   };
 
   const handleRiderSubmit = async (requestData) => {
     try {
+      let token = null;
+      if (supabase) {
+        const { data: { session } } = await supabase.auth.getSession();
+        token = session?.access_token;
+      }
+      
+      if (!token) {
+        alert('Please log in to request a ride');
+        return;
+      }
+      
       const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/requests`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(requestData)
       });
+      
       if (res.ok) {
         console.log("Rider requested ride:", requestData);
         alert('Ride request submitted successfully!');
       } else {
-        console.error('Failed to submit ride request');
+        const error = await res.json();
+        alert(error.error || 'Failed to submit ride request');
+        console.error('Failed to submit ride request:', error);
       }
     } catch (err) {
       console.error('Failed to submit ride request:', err);
+      alert('Network error: Could not submit request');
     }
   };
 
@@ -95,7 +127,6 @@ function Home() {
     <div className="min-h-screen">
       <div className="mx-auto max-w-6xl p-6 grid gap-10 lg:grid-cols-[2fr,1.5fr]">
 
-        {/* Left Column */}
         <section className="space-y-6">
           <h1 className="text-3xl font-semibold text-gray-800 bg-gray">
             Find or share rides with Cruze
@@ -118,7 +149,6 @@ function Home() {
           </div>
         </section>
 
-        {/* Right Column */}
         <section className="space-y-4 mt-4">
           <h2 className="text-lg font-medium text-gray-800">Map view</h2>
           <div className="border rounded-xl bg-white shadow-md shadow-slate-200/70 p-2 h-[340px]">

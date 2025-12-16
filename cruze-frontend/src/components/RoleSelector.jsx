@@ -1,4 +1,3 @@
-// src/components/RoleSelector.jsx
 function RoleSelector({ role, onChange }) {
   const base =
     "px-3 py-2 rounded-md text-sm border cursor-pointer transition-colors";

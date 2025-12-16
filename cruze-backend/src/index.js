@@ -9,13 +9,11 @@ import getRawBody from 'raw-body'
 const app = express()
 const PORT = process.env.PORT || 5050
 
-// --- CORS ---
 app.use(cors({
   origin: process.env.FRONTEND_URL?.split(',') || '*',
   credentials: true
 }))
 
-// Stripe needs raw for webhook, JSON elsewhere
 app.use((req, res, next) => {
   if (req.path === '/webhooks/stripe') return next()
   express.json()(req, res, next)
@@ -27,12 +25,48 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null
 
-// --- Routes ---
+const requireAuth = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'No authentication token provided' });
+  }
+  
+  const token = authHeader.replace('Bearer ', '');
+  
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (error || !user) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+    
+    req.user = user;
+    next();
+  } catch (err) {
+    console.error('Auth middleware error:', err);
+    return res.status(500).json({ error: 'Authentication failed' });
+  }
+};
+
+const optionalAuth = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.replace('Bearer ', '');
+    try {
+      const { data: { user } } = await supabase.auth.getUser(token);
+      if (user) req.user = user;
+    } catch (err) {
+    }
+  }
+  next();
+};
+
 app.get('/', (_, res) => res.send('Cruze backend is running. Try /health or /api/trips'))
 
 app.get('/health', (_, res) => res.json({ ok: true }))
 
-// Get all trips from Supabase
 app.get('/api/trips', async (_, res) => {
   const { data, error } = await supabase
     .from('trips')
@@ -43,13 +77,42 @@ app.get('/api/trips', async (_, res) => {
   res.json(data)
 })
 
-// Create a new trip in Supabase
-app.post('/api/trips', async (req, res) => {
+app.get('/api/trips/my', requireAuth, async (req, res) => {
+  const { data, error } = await supabase
+    .from('trips')
+    .select('*')
+    .eq('user_id', req.user.id)
+    .order('created_at', { ascending: false })
+  
+  if (error) return res.status(500).json({ error: error.message })
+  res.json(data)
+})
+
+app.get('/api/requests/my', requireAuth, async (req, res) => {
+  const { data, error } = await supabase
+    .from('ride_requests')
+    .select('*')
+    .eq('user_id', req.user.id)
+    .order('created_at', { ascending: false })
+  
+  if (error) return res.status(500).json({ error: error.message })
+  res.json(data)
+})
+
+app.post('/api/trips', requireAuth, async (req, res) => {
   const { origin, destination, date, time, seats, price } = req.body
   
   const { data, error } = await supabase
     .from('trips')
-    .insert([{ origin, destination, date, time, seats, price }])
+    .insert([{ 
+      origin, 
+      destination, 
+      date, 
+      time, 
+      seats, 
+      price,
+      user_id: req.user.id
+    }])
     .select()
     .single()
   
@@ -57,8 +120,7 @@ app.post('/api/trips', async (req, res) => {
   res.status(201).json(data)
 })
 
-// Create a new ride request in Supabase
-app.post('/api/requests', async (req, res) => {
+app.post('/api/requests', requireAuth, async (req, res) => {
   const { origin, destination, date, timeWindow, seatsNeeded, trip_id } = req.body
   
   const { data, error } = await supabase
@@ -70,7 +132,8 @@ app.post('/api/requests', async (req, res) => {
       time_window: timeWindow, 
       seats_needed: seatsNeeded,
       trip_id,
-      status: 'pending' 
+      status: 'pending',
+      user_id: req.user.id
     }])
     .select()
     .single()
@@ -79,7 +142,6 @@ app.post('/api/requests', async (req, res) => {
   res.status(201).json(data)
 })
 
-// Fetch matching candidates from Supabase and call matching service
 app.get('/api/match/:tripId', async (req, res) => {
   const { data: candidates, error } = await supabase
     .from('ride_requests')
@@ -103,10 +165,9 @@ app.get('/api/match/:tripId', async (req, res) => {
 })
 
 app.post('/api/checkout', async (req, res) => {
-  if (!stripe) return res.json({ url: 'https://example.com/checkout-demo' }) // dev fallback
+  if (!stripe) return res.json({ url: 'https://example.com/checkout-demo' })
   const { trip_id } = req.body
   
-  // Fetch trip from Supabase
   const { data: trip, error } = await supabase
     .from('trips')
     .select('*')
@@ -131,7 +192,6 @@ app.post('/api/checkout', async (req, res) => {
   res.json({ url: session.url })
 })
 
-// --- Stripe webhook ---
 app.post('/webhooks/stripe', async (req, res) => {
   if (!stripe) return res.json({ received: true, note: 'no stripe key set' })
   const sig = req.headers['stripe-signature']
@@ -151,13 +211,11 @@ app.post('/webhooks/stripe', async (req, res) => {
   }
 
   if (event.type === 'checkout.session.completed') {
-    // Here you would mark booking as paid in Supabase
     console.log('Payment succeeded:', event.data.object.id)
   }
   res.json({ received: true })
 })
 
-// --- Google Maps proxy ---
 app.get('/api/maps/distance', async (req, res) => {
   const { origins, destinations } = req.query
   if (!process.env.GOOGLE_MAPS_API_KEY) return res.status(400).json({ error: 'no maps key' })

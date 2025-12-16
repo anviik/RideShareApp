@@ -1,4 +1,3 @@
-// src/components/DriverForm.jsx
 import { useState } from "react";
 
 function DriverForm({ onSubmit }) {
@@ -19,8 +18,6 @@ function DriverForm({ onSubmit }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     onSubmit(form);
-    // optional: reset
-    // setForm({ ...form, price: "", seats: 1 });
   };
 
   return (

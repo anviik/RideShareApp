@@ -1,4 +1,3 @@
-// src/components/RiderForm.jsx
 import { useState } from "react";
 
 function RiderForm({ onSubmit }) {

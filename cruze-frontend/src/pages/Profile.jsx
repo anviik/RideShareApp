@@ -1,4 +1,3 @@
-// src/pages/Profile.jsx
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
@@ -30,12 +29,15 @@ function Profile() {
     user: null,
     note: "",
   });
+  
+  const [userTrips, setUserTrips] = useState([]);
+  const [userRequests, setUserRequests] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
 
     const loadUser = async () => {
-      // Check for locally persisted profile (set during login/signup)
       const stored = localStorage.getItem("user");
       if (stored) {
         try {
@@ -48,7 +50,6 @@ function Profile() {
             setState({ status: "ready", user: shapeUser(parsed), note: "" });
           return;
         } catch (_) {
-          // fall through to supabase lookup
         }
       }
 
@@ -86,6 +87,45 @@ function Profile() {
       cancelled = true;
     };
   }, []);
+  
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (state.status !== "ready" || !supabase) return;
+      
+      setLoadingData(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        
+        if (!token) {
+          setLoadingData(false);
+          return;
+        }
+        
+        const tripsRes = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/trips/my`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (tripsRes.ok) {
+          const trips = await tripsRes.json();
+          setUserTrips(trips);
+        }
+        
+        const requestsRes = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/requests/my`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (requestsRes.ok) {
+          const requests = await requestsRes.json();
+          setUserRequests(requests);
+        }
+      } catch (err) {
+        console.error('Failed to load user data:', err);
+      } finally {
+        setLoadingData(false);
+      }
+    };
+    
+    loadUserData();
+  }, [state.status]);
 
   if (state.status === "loading") {
     return (
@@ -177,6 +217,71 @@ function Profile() {
           </h2>
           <p className="text-sm text-slate-700 leading-relaxed">{user.bio}</p>
         </div>
+      </div>
+      
+      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-900 mb-4">
+          My Activity
+        </h2>
+        
+        {loadingData ? (
+          <p className="text-sm text-slate-600">Loading your trips and requests...</p>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-800 mb-3">
+                My Trips ({userTrips.length})
+              </h3>
+              {userTrips.length === 0 ? (
+                <p className="text-sm text-slate-600">No trips created yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {userTrips.map((trip) => (
+                    <div key={trip.id} className="border border-slate-200 rounded-lg p-3 text-sm">
+                      <div className="font-medium text-slate-900">
+                        {trip.origin} → {trip.destination}
+                      </div>
+                      <div className="text-xs text-slate-600 mt-1">
+                        {trip.date} • {trip.seats} seats • ${trip.price}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div>
+              <h3 className="text-sm font-semibold text-slate-800 mb-3">
+                My Ride Requests ({userRequests.length})
+              </h3>
+              {userRequests.length === 0 ? (
+                <p className="text-sm text-slate-600">No ride requests yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {userRequests.map((request) => (
+                    <div key={request.id} className="border border-slate-200 rounded-lg p-3 text-sm">
+                      <div className="font-medium text-slate-900">
+                        {request.origin} → {request.destination}
+                      </div>
+                      <div className="text-xs text-slate-600 mt-1">
+                        {request.date} • {request.seats_needed} seats needed
+                      </div>
+                      <div className="text-xs font-medium mt-1">
+                        <span className={`px-2 py-0.5 rounded ${
+                          request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          request.status === 'matched' ? 'bg-green-100 text-green-800' :
+                          'bg-slate-100 text-slate-800'
+                        }`}>
+                          {request.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,4 +1,3 @@
-# cruze-matching/app.py
 import os
 from datetime import datetime
 from typing import List, Optional, Tuple
@@ -13,7 +12,7 @@ class Candidate(BaseModel):
     id: str
     origin: Optional[str] = None
     destination: Optional[str] = None
-    date: Optional[str] = None  # ISO date string from Supabase
+    date: Optional[str] = None
     time_window: Optional[str] = None
     seats_needed: Optional[int] = Field(default=None, ge=1)
     status: Optional[str] = None
@@ -55,12 +54,10 @@ def score_candidate(c: Candidate) -> Tuple[float, str]:
     score = 0.5
     reasons = []
 
-    # Penalize non-pending requests
     if c.status and c.status.lower() != "pending":
         score -= 0.4
         reasons.append(f"status {c.status}")
 
-    # Seats: prefer smaller asks, gently penalize large groups
     seats = c.seats_needed or 1
     if seats == 1:
         score += 0.1
@@ -78,12 +75,10 @@ def score_candidate(c: Candidate) -> Tuple[float, str]:
         score -= 0.12
         reasons.append(f"large party ({seats})")
 
-    # Require origin/destination
     if not c.origin or not c.destination:
         score -= 0.25
         reasons.append("missing origin/destination")
 
-    # Prefer requests with a time window
     if c.time_window:
         score += 0.08
         reasons.append("has time window")
@@ -91,7 +86,6 @@ def score_candidate(c: Candidate) -> Tuple[float, str]:
         score -= 0.04
         reasons.append("no time window")
 
-    # Date weighting
     today = datetime.utcnow().date()
     if c.date:
         req_date = _parse_date(c.date)
@@ -106,7 +100,6 @@ def score_candidate(c: Candidate) -> Tuple[float, str]:
             score -= 0.05
             reasons.append("invalid date")
 
-    # Recency of request
     if c.created_at:
         created_dt = _parse_datetime(c.created_at)
         if created_dt:

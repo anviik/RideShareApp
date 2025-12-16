@@ -1,4 +1,3 @@
-// src/pages/Dashboard.jsx
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
@@ -28,14 +27,12 @@ function Dashboard() {
     let cancelled = false;
 
     const loadUser = async () => {
-      // Prefer stored user (set after auth)
       const stored = readStoredUser();
       if (stored && !cancelled) {
         setUserState({ status: "ready", user: stored });
         return;
       }
 
-      // Fallback to Supabase auth lookup
       if (!supabase) {
         if (!cancelled) setUserState({ status: "guest", user: null });
         return;
