@@ -11,6 +11,18 @@ function Home() {
   const [rides, setRides] = useState([]);
 
   useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('=== AUTH DEBUG ===');
+      console.log('Current session:', session);
+      console.log('User:', session?.user);
+      console.log('Access token:', session?.access_token);
+      console.log('================');
+    };
+    checkAuth();
+  }, []);
+
+  useEffect(() => {
     const stored = localStorage.getItem("user");
     if (!stored) return;
     try {

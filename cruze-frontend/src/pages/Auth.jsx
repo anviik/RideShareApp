@@ -85,7 +85,7 @@ function Auth() {
           window.__USER__ = profile;
         }
 
-        navigate("/profile");
+        navigate("/home");
       } catch (err) {
         setAuthError(err.message || "Authentication failed");
       } finally {
