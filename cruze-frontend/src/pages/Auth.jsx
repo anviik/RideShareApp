@@ -71,7 +71,25 @@ function Auth() {
           if (error) throw error;
         }
 
-        navigate("/");
+        // Persist the signed-in user locally for profile rendering
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData?.user) {
+          const profile = {
+            id: userData.user.id,
+            email: userData.user.email,
+            username:
+              userData.user.user_metadata?.username ||
+              userData.user.email?.split("@")[0] ||
+              "User",
+            role: userData.user.user_metadata?.role || "rider",
+            guest: false,
+          };
+
+          localStorage.setItem("user", JSON.stringify(profile));
+          window.__USER__ = profile;
+        }
+
+        navigate("/profile");
       } catch (err) {
         setAuthError(err.message || "Authentication failed");
       } finally {

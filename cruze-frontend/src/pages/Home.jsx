@@ -10,6 +10,34 @@ function Home() {
   const [role, setRole] = useState("rider");
   const [rides, setRides] = useState([]);
 
+  // Prefer a previously chosen role if available
+  useEffect(() => {
+    const stored = localStorage.getItem("user");
+    if (!stored) return;
+    try {
+      const parsed = JSON.parse(stored);
+      if (parsed?.role && parsed.role !== "guest") {
+        setRole(parsed.role);
+      }
+    } catch (_) {
+      /* ignore malformed local storage */
+    }
+  }, []);
+
+  // When role changes on Home, persist it to keep dashboard consistent
+  useEffect(() => {
+    const stored = localStorage.getItem("user");
+    if (!stored) return;
+    try {
+      const parsed = JSON.parse(stored);
+      const updated = { ...parsed, role };
+      localStorage.setItem("user", JSON.stringify(updated));
+      window.__USER__ = updated;
+    } catch (_) {
+      /* ignore persistence errors */
+    }
+  }, [role]);
+
   // Fetch trips from backend on mount
   useEffect(() => {
     const fetchTrips = async () => {
