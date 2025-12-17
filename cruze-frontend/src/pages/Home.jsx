@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Navigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import RoleSelector from "../components/RoleSelector";
 import DriverForm from "../components/DriverForm";
@@ -7,44 +8,56 @@ import RideList from "../components/RideList";
 import MapView from "../components/MapView";
 
 function Home() {
-  const [role, setRole] = useState("rider");
+  const [user, setUser] = useState(null);
+  const [viewRole, setViewRole] = useState("rider");
+  const [status, setStatus] = useState("loading");
   const [rides, setRides] = useState([]);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log('=== AUTH DEBUG ===');
-      console.log('Current session:', session);
-      console.log('User:', session?.user);
-      console.log('Access token:', session?.access_token);
-      console.log('================');
-    };
-    checkAuth();
-  }, []);
-
-  useEffect(() => {
-    const stored = localStorage.getItem("user");
-    if (!stored) return;
-    try {
-      const parsed = JSON.parse(stored);
-      if (parsed?.role && parsed.role !== "guest") {
-        setRole(parsed.role);
+    const loadUser = async () => {
+      const stored = localStorage.getItem("user");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          setUser(parsed);
+          setViewRole(parsed.role === "both" ? "driver" : parsed.role || "rider");
+          setStatus("ready");
+          return;
+        } catch {
+          /* fall through to Supabase fetch */
+        }
       }
-    } catch (_) {
-    }
-  }, []);
 
-  useEffect(() => {
-    const stored = localStorage.getItem("user");
-    if (!stored) return;
-    try {
-      const parsed = JSON.parse(stored);
-      const updated = { ...parsed, role };
-      localStorage.setItem("user", JSON.stringify(updated));
-      window.__USER__ = updated;
-    } catch (_) {
-    }
-  }, [role]);
+      if (!supabase) {
+        setStatus("guest");
+        return;
+      }
+
+      const { data, error } = await supabase.auth.getUser();
+      if (error || !data?.user) {
+        setStatus("guest");
+        return;
+      }
+
+      const shaped = {
+        id: data.user.id,
+        email: data.user.email,
+        username:
+          data.user.user_metadata?.username ||
+          data.user.email?.split("@")[0] ||
+          "User",
+        role: data.user.user_metadata?.role || "rider",
+        guest: false,
+      };
+      localStorage.setItem("user", JSON.stringify(shaped));
+      window.__USER__ = shaped;
+      setUser(shaped);
+      setViewRole(shaped.role === "both" ? "driver" : shaped.role || "rider");
+      setStatus("ready");
+    };
+
+    loadUser();
+  }, []);
 
   useEffect(() => {
     const fetchTrips = async () => {
@@ -61,7 +74,39 @@ function Home() {
     fetchTrips();
   }, []);
 
+  if (status === "guest") {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (status === "loading") {
+    return (
+      <div className="text-sm text-slate-600">
+        Loading your dashboard...
+      </div>
+    );
+  }
+
+  const accountRole = user?.role || "rider";
+  const canDrive = accountRole === "driver" || accountRole === "both";
+  const canRide = accountRole === "rider" || accountRole === "both";
+  const activeRole =
+    accountRole === "both" ? viewRole : accountRole === "driver" ? "driver" : "rider";
+
+  if (!canDrive && !canRide) {
+    return (
+      <div className="text-sm text-slate-600">
+        Your account does not have a rider or driver role. Please sign out and
+        log in again.
+      </div>
+    );
+  }
+
   const handleDriverSubmit = async (tripData) => {
+    if (!canDrive) {
+      alert("Your account is not allowed to post rides.");
+      return;
+    }
+
     try {
       let token = null;
       if (supabase) {
@@ -74,11 +119,11 @@ function Home() {
         return;
       }
       
-      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/trips`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/trips`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(tripData)
       });
@@ -100,6 +145,11 @@ function Home() {
   };
 
   const handleRiderSubmit = async (requestData) => {
+    if (!canRide) {
+      alert("Your account is not allowed to request rides.");
+      return;
+    }
+
     try {
       let token = null;
       if (supabase) {
@@ -140,25 +190,65 @@ function Home() {
       <div className="mx-auto max-w-6xl p-6 grid gap-10 lg:grid-cols-[2fr,1.5fr]">
 
         <section className="space-y-6">
-          <h1 className="text-3xl font-semibold text-gray-800 bg-gray">
-            Find or share rides with Cruze
-          </h1>
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <h1 className="text-3xl font-semibold text-gray-800 bg-gray">
+              {activeRole === "driver" ? "Driver dashboard" : "Rider dashboard"}
+            </h1>
+            {accountRole === "both" && (
+              <div className="flex items-center gap-3">
+                <div className="text-xs text-slate-600">
+                  Switch mode:
+                </div>
+                <RoleSelector role={viewRole} onChange={setViewRole} />
+              </div>
+            )}
+          </div>
 
-          <div className="border rounded-xl p-4 bg-white shadow-md shadow-slate-200/70">
-            <RoleSelector role={role} onChange={setRole} />
-
-            <div className="mt-4">
-              {role === "driver" ? (
-                <DriverForm onSubmit={handleDriverSubmit} />
-              ) : (
-                <RiderForm onSubmit={handleRiderSubmit} />
-              )}
+          <div className="border rounded-xl p-4 bg-white shadow-sm text-sm text-slate-700 flex items-center justify-between">
+            <div>
+              Logged in as{" "}
+              <span className="font-semibold text-slate-900">
+                {user?.username || user?.email || "User"}
+              </span>{" "}
+              · role: {accountRole}
             </div>
+            {accountRole !== "both" && (
+              <div className="text-xs text-slate-500">
+                This view is restricted to your role.
+              </div>
+            )}
           </div>
 
-          <div className="border rounded-xl p-4 bg-white shadow-md shadow-slate-200/70">
-            <RideList rides={rides} />
-          </div>
+          {activeRole === "driver" && canDrive && (
+            <div className="space-y-4">
+              <div className="border rounded-xl p-4 bg-white shadow-md shadow-slate-200/70">
+                <DriverForm onSubmit={handleDriverSubmit} />
+              </div>
+              <div className="border rounded-xl p-4 bg-white shadow-md shadow-slate-200/70">
+                <h2 className="text-lg font-medium text-gray-800 mb-2">
+                  Available rides
+                </h2>
+                <RideList rides={rides} />
+              </div>
+            </div>
+          )}
+
+          {activeRole === "rider" && canRide && (
+            <div className="space-y-4">
+              <div className="border rounded-xl p-4 bg-white shadow-md shadow-slate-200/70">
+                <h2 className="text-lg font-medium text-gray-800 mb-2">
+                  Available rides
+                </h2>
+                <RideList rides={rides} />
+              </div>
+              <div className="border rounded-xl p-4 bg-white shadow-md shadow-slate-200/70">
+                <h3 className="text-sm font-semibold text-slate-800 mb-2">
+                  Want to request a ride?
+                </h3>
+                <RiderForm onSubmit={handleRiderSubmit} />
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="space-y-4 mt-4">
