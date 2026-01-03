@@ -25,6 +25,107 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null
 
+const todayStart = () => {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+}
+
+const parseDateOnly = (value) => {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+const parseDateTime = (value) => {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return date
+}
+
+const scoreCandidate = (candidate) => {
+  let score = 0.5
+  const reasons = []
+
+  if (candidate.status && candidate.status.toLowerCase() !== 'pending') {
+    score -= 0.4
+    reasons.push(`status ${candidate.status}`)
+  }
+
+  const seats = Number.isFinite(candidate.seats_needed) ? candidate.seats_needed : 1
+  if (seats === 1) {
+    score += 0.1
+    reasons.push('solo rider')
+  } else if (seats === 2) {
+    score += 0.08
+    reasons.push('small party')
+  } else if (seats === 3) {
+    score += 0.05
+    reasons.push('moderate party')
+  } else if (seats === 4) {
+    score += 0.02
+    reasons.push('medium party')
+  } else {
+    score -= 0.12
+    reasons.push(`large party (${seats})`)
+  }
+
+  if (!candidate.origin || !candidate.destination) {
+    score -= 0.25
+    reasons.push('missing origin/destination')
+  }
+
+  if (candidate.time_window) {
+    score += 0.08
+    reasons.push('has time window')
+  } else {
+    score -= 0.04
+    reasons.push('no time window')
+  }
+
+  const today = todayStart()
+  if (candidate.date) {
+    const reqDate = parseDateOnly(candidate.date)
+    if (reqDate) {
+      if (reqDate >= today) {
+        score += 0.07
+        reasons.push('date ok')
+      } else {
+        score -= 0.2
+        reasons.push('date in past')
+      }
+    } else {
+      score -= 0.05
+      reasons.push('invalid date')
+    }
+  }
+
+  if (candidate.created_at) {
+    const created = parseDateTime(candidate.created_at)
+    if (created) {
+      const createdDay = new Date(created.getFullYear(), created.getMonth(), created.getDate())
+      const ageDays = Math.floor((today - createdDay) / (1000 * 60 * 60 * 24))
+      if (ageDays <= 1) {
+        score += 0.05
+        reasons.push('fresh request')
+      } else if (ageDays <= 7) {
+        score += 0.02
+        reasons.push('recent request')
+      } else if (ageDays > 30) {
+        score -= 0.05
+        reasons.push('stale request')
+      }
+    }
+  }
+
+  const finalScore = Math.min(1, Math.max(0, score))
+  return {
+    score: finalScore,
+    reason: reasons.length ? reasons.join(', ') : 'default weighting'
+  }
+}
+
 const requireAuth = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   
@@ -149,19 +250,24 @@ app.get('/api/match/:tripId', async (req, res) => {
     .eq('trip_id', req.params.tripId)
   
   if (error) return res.status(500).json({ error: error.message })
-  
-  try {
-    const resp = await fetch(`${process.env.MATCHING_URL}/match`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-internal-token': process.env.INTERNAL_TOKEN || '' },
-      body: JSON.stringify({ tripId: req.params.tripId, candidates })
+
+  const scored = candidates
+    .map((candidate) => {
+      const { score, reason } = scoreCandidate(candidate)
+      return {
+        id: candidate.id,
+        score: Number(score.toFixed(3)),
+        reason,
+        candidate
+      }
     })
-    const data = await resp.json()
-    return res.json(data)
-  } catch (e) {
-    console.error(e)
-    return res.status(500).json({ error: 'matching service error' })
-  }
+    .sort((a, b) => b.score - a.score)
+
+  return res.json({
+    tripId: req.params.tripId,
+    count: scored.length,
+    matches: scored
+  })
 })
 
 app.post('/api/checkout', async (req, res) => {

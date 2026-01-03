@@ -7,11 +7,40 @@ import RiderForm from "../components/RiderForm";
 import RideList from "../components/RideList";
 import MapView from "../components/MapView";
 
+const LOCAL_TRIPS_KEY = "cruze_local_trips";
+const LOCAL_REQUESTS_KEY = "cruze_local_requests";
+
+const readLocal = (key) => {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeLocal = (key, value) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* ignore */
+  }
+};
+
 function Home() {
+  const backendBase = import.meta.env.VITE_BACKEND_URL;
+  const backendUrl =
+    typeof window !== "undefined" &&
+    window.location.protocol === "https:" &&
+    backendBase?.startsWith("http://")
+      ? backendBase.replace("http://", "https://")
+      : backendBase;
+
   const [user, setUser] = useState(null);
   const [viewRole, setViewRole] = useState("rider");
   const [status, setStatus] = useState("loading");
   const [rides, setRides] = useState([]);
+  const [requests, setRequests] = useState([]);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -61,18 +90,29 @@ function Home() {
 
   useEffect(() => {
     const fetchTrips = async () => {
+      // Load local first for instant display.
+      const localTrips = readLocal(LOCAL_TRIPS_KEY);
+      if (localTrips.length) setRides(localTrips);
+
+      if (!backendUrl) return;
+
       try {
-        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/trips`);
+        const res = await fetch(`${backendUrl}/api/trips`);
         if (res.ok) {
           const data = await res.json();
-          setRides(data);
+          setRides((prev) => {
+            const locals = prev.filter((t) => t.localOnly);
+            const merged = [...locals, ...data];
+            writeLocal(LOCAL_TRIPS_KEY, merged);
+            return merged;
+          });
         }
       } catch (err) {
         console.error('Failed to load trips:', err);
       }
     };
     fetchTrips();
-  }, []);
+  }, [backendUrl]);
 
   if (status === "guest") {
     return <Navigate to="/login" replace />;
@@ -107,40 +147,54 @@ function Home() {
       return;
     }
 
+    const optimistic = {
+      ...tripData,
+      id: `local-${Date.now()}`,
+      localOnly: true,
+    };
+    setRides((prev) => {
+      const next = [optimistic, ...prev];
+      writeLocal(LOCAL_TRIPS_KEY, next);
+      return next;
+    });
+
+    let token = null;
+    if (supabase) {
+      const { data: { session } } = await supabase.auth.getSession();
+      token = session?.access_token;
+    }
+
+    if (!backendUrl) {
+      alert("Trip saved locally (no backend configured).");
+      return;
+    }
+
     try {
-      let token = null;
-      if (supabase) {
-        const { data: { session } } = await supabase.auth.getSession();
-        token = session?.access_token;
-      }
-      
-      if (!token) {
-        alert('Please log in to create a trip');
-        return;
-      }
-      
-        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/trips`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+      const res = await fetch(`${backendUrl}/api/trips`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify(tripData)
       });
       
       if (res.ok) {
         const newTrip = await res.json();
-        setRides(prev => [newTrip, ...prev]);
-        console.log("Driver posted trip:", newTrip);
+        setRides(prev =>
+          prev.map((t) => (t.id === optimistic.id ? newTrip : t))
+        );
+        const updatedLocal = readLocal(LOCAL_TRIPS_KEY).filter((t) => t.id !== optimistic.id);
+        writeLocal(LOCAL_TRIPS_KEY, updatedLocal);
         alert('Trip created successfully!');
       } else {
         const error = await res.json();
-        alert(error.error || 'Failed to post trip');
         console.error('Failed to post trip:', error);
+        alert(error.error || 'Failed to post trip; kept locally.');
       }
     } catch (err) {
       console.error('Failed to post trip:', err);
-      alert('Network error: Could not create trip');
+      alert('Backend unreachable. Trip saved locally.');
     }
   };
 
@@ -157,16 +211,26 @@ function Home() {
         token = session?.access_token;
       }
       
-      if (!token) {
-        alert('Please log in to request a ride');
+      if (!backendUrl) {
+        const local = {
+          ...requestData,
+          id: `local-req-${Date.now()}`,
+          localOnly: true,
+        };
+        setRequests((prev) => {
+          const next = [local, ...prev];
+          writeLocal(LOCAL_REQUESTS_KEY, next);
+          return next;
+        });
+        alert('Request saved locally (no backend configured).');
         return;
       }
       
-      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/requests`, {
+      const res = await fetch(`${backendUrl}/api/requests`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify(requestData)
       });
