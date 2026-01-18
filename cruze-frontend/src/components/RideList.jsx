@@ -27,6 +27,11 @@ function RideList({ rides }) {
                 {trip.date || "date tbd"}{" "}
                 {trip.time ? `at ${trip.time}` : ""}
               </div>
+              {typeof trip.distance_miles === "number" && (
+                <div className="text-xs text-slate-500">
+                  {trip.distance_miles.toFixed(1)} mi from your destination
+                </div>
+              )}
             </div>
             {trip.price && (
               <div className="mt-2 md:mt-0 text-xs text-slate-700">

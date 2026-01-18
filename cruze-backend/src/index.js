@@ -44,6 +44,17 @@ const parseDateTime = (value) => {
   return date
 }
 
+const METERS_PER_MILE = 1609.344
+const MAX_DESTINATIONS_PER_REQUEST = 25
+
+const chunkArray = (items, size) => {
+  const chunks = []
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size))
+  }
+  return chunks
+}
+
 const scoreCandidate = (candidate) => {
   let score = 0.5
   const reasons = []
@@ -176,6 +187,58 @@ app.get('/api/trips', async (_, res) => {
   
   if (error) return res.status(500).json({ error: error.message })
   res.json(data)
+})
+
+app.get('/api/trips/search', async (req, res) => {
+  const destination = typeof req.query.destination === 'string' ? req.query.destination.trim() : ''
+  const radiusMiles = Number.isFinite(Number(req.query.radiusMiles))
+    ? Number(req.query.radiusMiles)
+    : 10
+
+  if (!destination) return res.status(400).json({ error: 'destination is required' })
+  if (!process.env.GOOGLE_MAPS_API_KEY) return res.status(400).json({ error: 'no maps key' })
+
+  const { data: trips, error } = await supabase
+    .from('trips')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (error) return res.status(500).json({ error: error.message })
+
+  const candidates = (trips || []).filter((trip) => trip.destination)
+  if (!candidates.length) return res.json({ trips: [], count: 0, radiusMiles })
+
+  const radiusMeters = Math.max(0, radiusMiles) * METERS_PER_MILE
+  const batches = chunkArray(candidates, MAX_DESTINATIONS_PER_REQUEST)
+  const matches = []
+
+  for (const batch of batches) {
+    const destinations = batch.map((trip) => trip.destination)
+    const encodedDestinations = destinations.map((item) => encodeURIComponent(item)).join('|')
+    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(destination)}&destinations=${encodedDestinations}&key=${process.env.GOOGLE_MAPS_API_KEY}`
+    const response = await fetch(url)
+    const payload = await response.json()
+
+    if (payload.status !== 'OK' || !Array.isArray(payload.rows)) {
+      return res.status(502).json({ error: 'distance lookup failed', detail: payload.status })
+    }
+
+    const elements = payload.rows[0]?.elements || []
+    elements.forEach((element, index) => {
+      if (element?.status !== 'OK') return
+      const meters = element.distance?.value
+      if (!Number.isFinite(meters)) return
+      if (meters <= radiusMeters) {
+        matches.push({
+          ...batch[index],
+          distance_miles: Number((meters / METERS_PER_MILE).toFixed(2))
+        })
+      }
+    })
+  }
+
+  matches.sort((a, b) => (a.distance_miles ?? 0) - (b.distance_miles ?? 0))
+  res.json({ trips: matches, count: matches.length, radiusMiles })
 })
 
 app.get('/api/trips/my', requireAuth, async (req, res) => {
